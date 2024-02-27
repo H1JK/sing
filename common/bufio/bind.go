@@ -11,12 +11,20 @@ import (
 type BindPacketConn interface {
 	N.NetPacketConn
 	net.Conn
-	HopTo(addr *net.UDPAddr)
 }
 
 type bindPacketConn struct {
 	N.NetPacketConn
 	addr net.Addr
+}
+
+type BindHoppingPacketConn interface {
+	BindPacketConn
+	HopTo(addr *net.UDPAddr)
+}
+
+type bindHoppingPacketConn struct {
+	bindPacketConn
 }
 
 func NewBindPacketConn(conn net.PacketConn, addr net.Addr) BindPacketConn {
@@ -26,7 +34,16 @@ func NewBindPacketConn(conn net.PacketConn, addr net.Addr) BindPacketConn {
 	}
 }
 
-func (c *bindPacketConn) HopTo(addr *net.UDPAddr) {
+func NewBindHoppingPacketConn(conn net.PacketConn, addr net.Addr) BindHoppingPacketConn {
+	return &bindHoppingPacketConn{
+		bindPacketConn{
+			NewPacketConn(conn),
+			addr,
+		},
+	}
+}
+
+func (c *bindHoppingPacketConn) HopTo(addr *net.UDPAddr) {
 	c.addr = addr
 }
 
@@ -35,9 +52,8 @@ func (c *bindPacketConn) Read(b []byte) (n int, err error) {
 	return
 }
 
-func (c *bindPacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
-	n, err = c.NetPacketConn.WriteTo(p, c.addr)
-	return
+func (c *bindHoppingPacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
+	return c.NetPacketConn.WriteTo(p, c.addr)
 }
 
 func (c *bindPacketConn) Write(b []byte) (n int, err error) {
